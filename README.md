@@ -1,23 +1,135 @@
-# ✨ Welcome to Your Spark Template!
-You've just launched your brand-new Spark Template Codespace — everything’s fired up and ready for you to explore, build, and create with Spark!
+# ☁️ 云端炼金 · Cloud Alchemy
 
-This template is your blank canvas. It comes with a minimal setup to help you get started quickly with Spark development.
+> 沙盒合成与配方探索游戏 — 拖拽、发现、收集，治愈系放松体验
 
-🚀 What's Inside?
-- A clean, minimal Spark environment
-- Pre-configured for local development
-- Ready to scale with your ideas
-  
-🧠 What Can You Do?
+![游戏状态](https://img.shields.io/badge/状态-可运行-brightgreen) ![技术栈](https://img.shields.io/badge/React_19_+_TypeScript_+_Vite-blue)
 
-Right now, this is just a starting point — the perfect place to begin building and testing your Spark applications.
+---
 
-🧹 Just Exploring?
-No problem! If you were just checking things out and don’t need to keep this code:
+## 🎮 游戏简介
 
-- Simply delete your Spark.
-- Everything will be cleaned up — no traces left behind.
+《云端炼金》是一款网页端休闲合成游戏。你将从最基础的**水、泥土、火焰、空气、木材**出发，通过拖拽合成发现越来越多的物品，逐步解锁从黏土、砖块到城堡、彩虹、神秘结晶等 **29 种物品**和 **24 条配方**。
 
-📄 License For Spark Template Resources 
+游戏没有失败、没有死亡惩罚，只有轻松愉快的探索乐趣。
 
-The Spark Template files and resources from GitHub are licensed under the terms of the MIT license, Copyright GitHub, Inc.
+---
+
+## ✨ 核心特色
+
+| 特色 | 说明 |
+|------|------|
+| 🧪 **拖拽合成** | 将物品拖到另一个物品上即可尝试合成，无需复杂操作 |
+| 📖 **图鉴收集** | 首次合成新物品时触发发现动画，图鉴自动解锁 |
+| �� **流浪商人** | 每天刷新 3 条交易报价，用已有资源换取新材料 |
+| 🔮 **神秘迷雾** | 未发现的物品以 `❓` 显示，激发探索欲 |
+| 🫧 **气泡动画** | 物品以彩色圆形气泡呈现，合成成功时伴随弹跳与粒子特效 |
+| 🎨 **治愈风格** | 马卡龙色系 + 暖米黄背景，轻松解压 |
+
+---
+
+## 🕹️ 游戏玩法
+
+### 基础操作
+
+1. **拖拽合成**：将背包中的一个物品拖拽到另一个物品上
+   - 若存在配方 → 消耗各 1 个，生成新物品（播放弹跳 + 粒子动画）
+   - 若不存在配方 → 两个物品互换位置
+   - 若目标格子为空 → 移动物品到该格子
+   - 若两者物品相同 → 合并堆叠数量
+
+2. **查看图鉴**：点击右侧"📖 图鉴"标签，查看已发现的物品和配方
+
+3. **交易商人**：点击右侧"🧙 商人"标签，浏览今日报价并点击"交换"按钮完成交易
+
+4. **下一天**：点击"☀️ 下一天"按钮刷新商人报价，开启新的一天
+
+### 合成路径示例
+
+```
+水 💧 + 泥土 🌍 → 黏土 🫙
+黏土 🫙 + 火焰 🔥 → 砖块 🧱
+砖块 🧱 + 木材 🪵 → 房屋 🏠
+房屋 🏠 + 云朵 ☁️ → 城堡 🏰
+```
+
+> 💡 提示：尝试所有基础元素的两两组合，逐步解锁更稀有的物品！
+
+---
+
+## 🚀 快速开始
+
+### 在线体验
+
+直接在支持的平台（如 GitHub Spark）上打开即可运行。
+
+### 本地运行
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/falling-feather/cloud-alchemy.git
+cd cloud-alchemy
+
+# 2. 安装依赖（需要 Node.js >= 18）
+npm install
+
+# 3. 启动开发服务器
+npm run dev
+# 访问 http://localhost:5000
+
+# 4. 构建生产版本
+npm run build
+```
+
+---
+
+## 🗺️ 物品稀有度
+
+游戏中共有 **5 个稀有度等级**，颜色越深越难获得：
+
+| 等级 | 气泡颜色 | 代表物品 |
+|------|---------|---------|
+| 🟡 基础 | 暖黄 | 水、泥土、火焰、空气、木材 |
+| 🟢 普通 | 薄荷绿 | 黏土、蒸汽、云朵… |
+| 🔵 罕见 | 天蓝 | 砖块、玻璃、闪电… |
+| 🟣 稀有 | 薰衣草紫 | 房屋、水晶、风暴… |
+| 🩷 传说 | 樱花粉 | 城堡、宝石、彩虹、神秘结晶 |
+
+---
+
+## 📁 项目结构（简览）
+
+```
+src/
+├── App.tsx              # 根组件
+├── store/gameStore.tsx  # 全局状态管理
+├── data/
+│   ├── items.ts         # 物品数据
+│   └── recipes.ts       # 配方 DAG
+└── components/
+    ├── InventoryGrid    # 背包网格
+    ├── InventorySlot    # 单个格子（拖拽逻辑）
+    ├── ItemBubble       # 物品气泡
+    ├── SynthesisParticles  # 合成粒子动画
+    ├── MerchantPanel    # 商人面板
+    └── CodexPanel       # 图鉴面板
+```
+
+> 详细的架构说明、模块文档和扩展指南，请参阅 **[DEVELOPER.md](./DEVELOPER.md)**。
+
+---
+
+## 🛠️ 技术栈
+
+- **框架**：React 19 + TypeScript
+- **构建**：Vite 7
+- **拖拽**：HTML5 原生 Drag and Drop API
+- **布局**：纯 CSS Grid
+- **动画**：CSS `@keyframes`
+- **状态管理**：React Context + `useReducer`
+- **UI 组件**：shadcn/ui（仅错误提示层使用）
+
+---
+
+## 📄 许可证
+
+本项目基于 [MIT License](./LICENSE) 开源。
