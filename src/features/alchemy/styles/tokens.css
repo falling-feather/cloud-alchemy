@@ -1,0 +1,23 @@
+/* 设计 token：与 Pencil「Illustrated Warm / Heritage Warmth」画稿 design/cloud-alchemy-ui.pen 对齐 */
+:root {
+  --pen-surface-primary: #f5f2e9;
+  --pen-surface-secondary: #e8e4d8;
+  --pen-foreground-primary: #2d2926;
+  --pen-foreground-secondary: #5e5954;
+  --pen-foreground-muted: #8c8782;
+  --pen-border-subtle: #dcd8cb;
+  --pen-accent-primary: #7d6b3d;
+  --pen-accent-secondary: #4a3f24;
+
+  --alchemy-bg: var(--pen-surface-primary);
+  --alchemy-surface: rgba(255, 255, 255, 0.78);
+  --alchemy-surface-2: #fffcf5;
+  --alchemy-border: color-mix(in srgb, var(--pen-border-subtle) 85%, var(--pen-accent-primary));
+  --alchemy-text: var(--pen-foreground-primary);
+  --alchemy-muted: var(--pen-foreground-muted);
+  --alchemy-accent: #7c6a9a;
+  --alchemy-accent-2: #2d9d78;
+  --alchemy-radius: 14px;
+  --alchemy-shadow: 0 4px 24px rgba(60, 40, 20, 0.08);
+  --alchemy-font: Inter, 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
