@@ -1,7 +1,7 @@
 # 《云端炼金》开发者文档
 
 > 项目代号：Cloud_Alchemy  
-> 技术栈：React 19 + TypeScript + Vite；游戏界面样式以 `src/index.css` 为主，`src/main.css` 引入 Tailwind（供 `components/ui` 与主题令牌使用）  
+> 技术栈：React 19 + TypeScript + Vite；游戏界面样式以 `src/styles/game-shell.css` 为主，`src/styles/tailwind.css` 引入 Tailwind（供 `components/ui` 与主题令牌使用）  
 > 定位：网页端休闲拖拽合成、资源管理与随机交易游戏
 
 ---
@@ -67,27 +67,38 @@
 cloud-alchemy/
 ├── index.html
 ├── package.json                # engines.node >=20.19；脚本含 npm test
-├── vitest.config.ts            # 纯逻辑单测（gameReducer）
+├── vitest.config.ts            # 纯逻辑单测（gameReducer / dailyPipeline）
 ├── runtime.config.json         # GitHub Spark 运行时（勿删）
 ├── spark.meta.json             # Spark 模板元数据（勿删）
 ├── vite.config.ts              # 含 spark-vite-plugin（Spark 发布需要）
+├── docs/                       # 项目文档（DEVELOPER.md 、 SECURITY.md）
+├── design/                     # Pencil 设计源文件（*.pen）
 │
 └── src/
     ├── main.tsx                # 入口；引入 @github/spark/spark
-    ├── app/App.tsx             # ⭐ 根布局 + GameProvider
+    ├── app/
+    │   ├── App.tsx             # ⭐ 根布局 + GameProvider + Toaster
+    │   ├── ErrorFallback.tsx   # 顶层 ErrorBoundary 后备
+    │   └── useLeftRailAutoCollapse.ts
     ├── game/                   # ⭐ 与 UI 解耦的游戏域
     │   ├── types.ts
-    │   ├── content/            # items / recipes / zod schemas / validate
+    │   ├── content/            # items / recipes / dailyEvents / onboarding / zod schemas / validate
     │   ├── rules/              # reducer、商人、初始背包、里程碑目标
+    │   ├── systems/            # farmland / inventoryOps / saplingGrowth
+    │   ├── progression/        # merchantTier
+    │   ├── world/              # weather / dailyPipeline / eventsRuntime
     │   └── persistence/        # localStorage 序列化与 hydrate
     ├── features/alchemy/
     │   ├── state/gameStore.tsx # Context + useReducer + 自动存档
-    │   └── ui/                 # 背包、商人、图鉴、粒子、目标面板
-    ├── components/ui/          # shadcn/ui（ErrorFallback 等）
+    │   └── ui/                 # 背包、商人、图鉴、粒子、田地、事件日志、世界栏
+    ├── components/ui/          # shadcn/ui（Sonner / Alert / Button 等）
+    ├── hooks/use-mobile.ts
     ├── lib/utils.ts
-    ├── index.css               # 游戏布局与动效
-    ├── main.css                # Tailwind 入口
-    └── styles/theme.css
+    ├── styles/
+    │   ├── tailwind.css        # Tailwind v4 入口（@import "tailwindcss"）
+    │   ├── game-shell.css      # 游戏全部自定义 CSS（BEM 命名）
+    │   └── theme.css           # Radix Colors / 主题令牌
+    └── types/vite-env.d.ts     # Spark 全局类型声明
 ```
 
 > ⭐ 标记为游戏核心文件，修改时需格外注意
@@ -162,12 +173,18 @@ interface SynthesisEvent {
 
 ```typescript
 interface GameState {
-  inventory: InventorySlot[];       // 背包数组（30 格）
-  discovered: string[];             // 已发现物品 ID 列表
-  discoveredRecipes: string[];      // 已发现配方键列表（如 "earth+water"）
-  day: number;                      // 当前天数（从 1 开始）
-  merchantOffers: TradeOffer[];     // 当天商人报价（最多 3 条）
-  lastSynthesis: SynthesisEvent | null; // 最近一次合成结果（用于触发动画）
+  inventory: InventorySlot[];           // 背包数组（30 格）
+  discovered: string[];                 // 已发现物品 ID 列表
+  discoveredRecipes: string[];          // 已发现配方键列表（如 "earth+water"）
+  day: number;                          // 当前天数（从 1 开始）
+  weather: Weather;                     // 当前天气（晴/雨/雾/大雾等）
+  merchantOffers: TradeOffer[];         // 当天商人报价
+  merchantTier: number;                 // 商人档位（随发现进度提升）
+  farmland: FarmlandState;              // 田地状态（unlocked + plots）
+  eventLog: { day: number; message: string }[]; // 近期事件（取最近 40 条）
+  tutorial: TutorialFlags;              // 新手引导状态位
+  lastSynthesis: SynthesisEvent | null; // 最近一次合成结果（触发粒子 / toast）
+  lastMorningSummary: string | null;    // 最近一次「下一天」后的提示文案（驱动早晨 toast）
 }
 ```
 
@@ -209,13 +226,17 @@ initialState
 
 ### 4.2 Action 类型
 
-| Action 类型       | 触发时机         | 主要逻辑                         |
-|-------------------|------------------|----------------------------------|
-| `DRAG_DROP`       | 拖拽释放         | 移动 / 堆叠 / 合成判定           |
-| `NEXT_DAY`        | 点击"下一天"按钮 | 天数 +1，刷新商人报价            |
-| `ACCEPT_TRADE`    | 点击"交换"按钮   | 消耗支付物品，添加收取物品       |
-| `CLEAR_SYNTHESIS` | 粒子动画结束后   | 清除 `lastSynthesis`（防重放）   |
-| `RESET_GAME`      | 点击「新游戏」并确认 | 恢复初始背包与图鉴（并覆盖存档） |
+| Action 类型                | 触发时机                  | 主要逻辑                                  |
+|---------------------------|---------------------------|-------------------------------------------|
+| `DRAG_DROP`               | 拖拽释放                  | 移动 / 堆叠 / 合成判定                       |
+| `NEXT_DAY`                | 点击「下一天」按钮          | 走 `dailyPipeline`：天数 +1、天气、雨水、庄稼生长、刷新商人报价、汇总早晨提示 |
+| `ACCEPT_TRADE`            | 点击「交换」按钮            | 消耗支付物品，添加收取物品                |
+| `UNLOCK_FARMLAND`         | 点击「开垦」按钮            | 消耗泥土×3，解锁田地                       |
+| `PLANT_PLOT`              | 点击某田块「种植」        | 消耗种子×1，记录 `harvestOnDay = day + CROP_GROW_DAYS` |
+| `HARVEST_PLOT`            | 点击某田块「收获」        | 设 day 达 harvestOnDay，获得药草×2              |
+| `DISMISS_MORNING_SUMMARY` | `MorningToastBridge` 在 toast 弹出后调用 | 清空 `lastMorningSummary`（防重推）         |
+| `CLEAR_SYNTHESIS`         | 粒子动画结束后            | 清除 `lastSynthesis`（防重放）               |
+| `RESET_GAME`              | 点击「新游戏」并确认        | 恢复初始背包与图鉴（并覆盖存档）             |
 
 ### 4.3 DRAG_DROP 判定流程
 
@@ -252,7 +273,7 @@ fromSlot → toSlot
 
 ```typescript
 useGame()      // 返回 { state, dispatch }，必须在 GameProvider 内使用
-useDispatch()  // dragDrop / nextDay / acceptTrade / clearSynthesis / resetGame
+useDispatch()  // dragDrop / nextDay / acceptTrade / unlockFarmland / plantPlot / harvestPlot / dismissMorningSummary / clearSynthesis / resetGame
 ```
 
 ---
@@ -324,12 +345,28 @@ onDone → clearSynthesis()
 ### 6.4 `MerchantPanel.tsx`
 
 - 展示当天 `merchantOffers`（默认条数由 `MERCHANT_CONFIG.maxOffers` 决定）
-- 未发现收取物显示迷雾；`NEXT_DAY` 刷新报价
+- 未发现收取物显示迷雾；资源不足时按钮变为「差 N」并附 `title` 提示；`NEXT_DAY` 刷新报价
+- 交换成功后调用 `toast(...)` 给出「🤝 给出×N → 获得×M」轻量反馈
 
 ### 6.5 `CodexPanel.tsx` / `GoalsPanel.tsx`
 
 - 图鉴：物品 / 配方双标签，进度统计
 - 目标：读取 `src/game/rules/goals.ts` 中里程碑，根据 `discovered` 等推导完成态
+
+### 6.6 `WorldBar.tsx` / `EventLogPanel.tsx`
+
+- 世界栏：顶部同行展示「第 N 天 / 今日天气 / 商人档位」
+- 事件日志：列出 `state.eventLog`（包含雨天雨水、开垦、收获、师另事件等）
+
+### 6.7 `FarmlandPanel.tsx`
+
+- 未解锁：提示「需泥土×3 + 种子」，点击开垦 → toast `🌾 田地已开垦`
+- 已解锁：展示 3 个田块，按钮交互会触发「🌱 播种」 / 「🌿 收获」轻量 toast
+
+### 6.8 `App.tsx 中的 Toast Bridges`
+
+- `SynthesisToastBridge`：监听 `state.lastSynthesis`，首次发现走 `toast.success`、已知物品走轻量 toast
+- `MorningToastBridge`：监听 `state.lastMorningSummary`，弹出「🌅 第 N 天 · 天气」+ 当日事件与可收获试柜提醒，随后 `dismissMorningSummary()`防重推
 
 ---
 
@@ -337,11 +374,11 @@ onDone → clearSynthesis()
 
 ### 7.1 文件职责划分
 
-| 文件                     | 职责                                          |
-|--------------------------|-----------------------------------------------|
-| `src/index.css`          | ⭐ 游戏全部自定义 CSS（BEM 命名）              |
-| `src/styles/theme.css`   | Tailwind + Radix Colors 令牌（UI 组件库层）   |
-| `src/main.css`           | Tailwind 基础指令（`@import "tailwindcss"`）  |
+| 文件                        | 职责                                            |
+|-----------------------------|-------------------------------------------------|
+| `src/styles/game-shell.css` | ⭐ 游戏全部自定义 CSS（BEM 命名）                  |
+| `src/styles/theme.css`      | Tailwind + Radix Colors 令牌（UI 组件库层）     |
+| `src/styles/tailwind.css`   | Tailwind v4 入口（`@import "tailwindcss"`）     |
 
 游戏 UI 与 UI 组件库（shadcn/ui）完全独立，避免样式污染。
 
@@ -438,7 +475,7 @@ npm run test
 |---------------------|----------------------------------------------|
 | `vite.config.ts`    | Vite 构建配置；含 `@github/spark/spark-vite-plugin`（Spark 发布勿删） |
 | `tsconfig.json`     | TypeScript 配置，路径别名 `@/*` → `src/*`   |
-| `tailwind.config.js`| Tailwind 配置（`main.css` / UI 层）          |
+| `tailwind.config.js`| Tailwind 配置（`tailwind.css` / UI 层）      |
 | `runtime.config.json` | GitHub Spark 应用运行时（与平台 app id 对应，勿删） |
 | `spark.meta.json`   | Spark 模板版本元数据（勿删）                 |
 
@@ -484,7 +521,7 @@ export const SLOT_COUNT = 30; // 改为所需格数
 
 若调整格数，请同步更新 `src/game/content/schemas.ts` 中 `persistedGameStateSchema` 对 `inventory` 数组长度的校验。
 
-同时在 `src/index.css` 调整网格列数：
+同时在 `src/styles/game-shell.css` 调整网格列数：
 
 ```css
 .inventory-grid {
@@ -502,4 +539,4 @@ export const SLOT_COUNT = 30; // 改为所需格数
 
 启动时 `assertValidGameContent()` 会校验物品与配方引用一致性（见 `src/game/content/validate.ts`）。
 
-*文档版本：v1.1 | 最后更新：2026-04*
+*文档版本：v1.2 | 最后更新：2026-05*

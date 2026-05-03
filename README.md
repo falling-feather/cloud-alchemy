@@ -87,7 +87,7 @@ npm run test
 
 ### GitHub Spark
 
-仓库根目录的 `runtime.config.json`、`spark.meta.json` 与入口中的 `@github/spark` 用于 **Spark 托管**；在 Spark 平台内预览与本地 `npm run dev` 行为可能略有差异，详见 [DEVELOPER.md](./DEVELOPER.md)。
+仓库根目录的 `runtime.config.json`、`spark.meta.json` 与入口中的 `@github/spark` 用于 **Spark 托管**；在 Spark 平台内预览与本地 `npm run dev` 行为可能略有差异，详见 [DEVELOPER.md](./docs/DEVELOPER.md)。
 
 游戏进度默认写入浏览器 **localStorage**（键名见 `src/game/persistence/storage.ts`）；标题栏提供 **新游戏** 以清空进度并恢复初始背包。
 
@@ -122,7 +122,7 @@ src/
 └── components/ui/                 # shadcn/ui（错误边界等）
 ```
 
-> 详细的架构说明、模块文档和扩展指南，请参阅 **[DEVELOPER.md](./DEVELOPER.md)**。
+> 详细的架构说明、模块文档和扩展指南，请参阅 **[DEVELOPER.md](./docs/DEVELOPER.md)**。
 
 ---
 

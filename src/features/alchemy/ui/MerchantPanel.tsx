@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'sonner';
 import { useGame, useDispatch } from '../state/gameStore';
 import { ITEMS } from '@/game/content/items';
 import { ItemBubble } from './ItemBubble';
@@ -11,9 +12,6 @@ export function MerchantPanel() {
     state.inventory
       .filter(s => s.itemType === itemType)
       .reduce((sum, s) => sum + s.amount, 0);
-
-  const canAfford = (itemType: string, amount: number) =>
-    getPlayerTotal(itemType) >= amount;
 
   return (
     <div className="merchant-panel">
@@ -28,7 +26,9 @@ export function MerchantPanel() {
       ) : (
         <div className="merchant-offers">
           {state.merchantOffers.map(offer => {
-            const affordable = canAfford(offer.give.itemType, offer.give.amount);
+            const playerHas = getPlayerTotal(offer.give.itemType);
+            const affordable = playerHas >= offer.give.amount;
+            const shortfall = Math.max(0, offer.give.amount - playerHas);
             const giveItem = ITEMS[offer.give.itemType];
             const receiveItem = ITEMS[offer.receive.itemType];
             if (!giveItem || !receiveItem) return null;
@@ -47,8 +47,8 @@ export function MerchantPanel() {
                     </div>
                     <span className="trade-amount">×{offer.give.amount}</span>
                   </div>
-                  <span className="trade-have">
-                    (拥有: {getPlayerTotal(offer.give.itemType)})
+                  <span className={`trade-have${affordable ? '' : ' trade-have--short'}`}>
+                    拥有 {playerHas}{affordable ? '' : ` · 差 ${shortfall}`}
                   </span>
                 </div>
                 <span className="trade-arrow">⇄</span>
@@ -75,10 +75,18 @@ export function MerchantPanel() {
                 <button
                   type="button"
                   className={`trade-btn ${affordable ? 'trade-btn--active' : 'trade-btn--disabled'}`}
-                  onClick={() => affordable && acceptTrade(offer.id)}
+                  onClick={() => {
+                    if (!affordable) return;
+                    acceptTrade(offer.id);
+                    toast(
+                      `🤝 ${giveItem.emoji}×${offer.give.amount} → ${isNew ? '✨' : receiveItem.emoji}×${offer.receive.amount}`,
+                      { duration: 1800 },
+                    );
+                  }}
                   disabled={!affordable}
+                  title={affordable ? '点击完成交换' : `还差 ${shortfall} 个${giveItem.name}`}
                 >
-                  {affordable ? '交换' : '不够'}
+                  {affordable ? '交换' : `差 ${shortfall}`}
                 </button>
               </div>
             );

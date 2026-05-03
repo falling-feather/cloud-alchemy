@@ -1,8 +1,8 @@
 import { type RefObject, useLayoutEffect, useState } from 'react';
 
 /** 中央区域可放的「正方形边长」过小时收起左侧栏，略大时再展开（滞回，减少抖动） */
-const COLLAPSE_BELOW = 268;
-const EXPAND_ABOVE = 348;
+const COLLAPSE_BELOW = 220;
+const EXPAND_ABOVE = 290;
 const HEADING_RESERVE_PX = 96;
 
 export function useLeftRailAutoCollapse(

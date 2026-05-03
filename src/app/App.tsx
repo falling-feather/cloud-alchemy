@@ -1,12 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { GameProvider, useDispatch } from '@/features/alchemy/state/gameStore';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Toaster, toast } from 'sonner';
+import { GameProvider, useDispatch, useGame } from '@/features/alchemy/state/gameStore';
 import { useLeftRailAutoCollapse } from '@/app/useLeftRailAutoCollapse';
+import { ITEMS } from '@/game/content/items';
+import { STARTER_ITEM_IDS } from '@/game/rules/inventory';
 import { InventoryGrid } from '@/features/alchemy/ui/InventoryGrid';
 import { MerchantPanel } from '@/features/alchemy/ui/MerchantPanel';
 import { CodexPanel } from '@/features/alchemy/ui/CodexPanel';
 import { GoalsPanel } from '@/features/alchemy/ui/GoalsPanel';
 import { WorldBar } from '@/features/alchemy/ui/WorldBar';
-import { MorningBanner } from '@/features/alchemy/ui/MorningBanner';
 import { EventLogPanel } from '@/features/alchemy/ui/EventLogPanel';
 import { FarmlandPanel } from '@/features/alchemy/ui/FarmlandPanel';
 
@@ -26,6 +28,107 @@ function GameHeaderActions() {
       <button type="button" className="new-game-btn" onClick={handleNewGame}>
         新游戏
       </button>
+    </div>
+  );
+}
+
+function HeaderTip() {
+  const { state } = useGame();
+  const tip = useMemo(() => {
+    const discoveredCount = state.discovered.length;
+    const affordableTrades = state.merchantOffers.filter(o =>
+      state.inventory
+        .filter(s => s.itemType === o.give.itemType)
+        .reduce((n, s) => n + s.amount, 0) >= o.give.amount,
+    ).length;
+    if (discoveredCount <= 5) {
+      return '💡 试着把 💧 拖到 🌍 上 — 看看会变出什么。';
+    }
+    if (!state.farmland.unlocked && state.inventory.some(s => s.itemType === 'earth')) {
+      return '🌾 攒满 3 块泥土，就能在右侧开垦田地，种出药草。';
+    }
+    if (affordableTrades > 0) {
+      return `🧙 商人今天有 ${affordableTrades} 桩你能负担的交易，去看看吧。`;
+    }
+    if (discoveredCount < 12) {
+      return '📖 把已发现的物品两两组合，会解锁更多配方。';
+    }
+    return '☀️ 点「下一天」让作物长大，并刷新商人报价。';
+  }, [state.discovered, state.merchantOffers, state.inventory, state.farmland.unlocked]);
+
+  return <p className="game-tip">{tip}</p>;
+}
+
+function SynthesisToastBridge() {
+  const { state } = useGame();
+  const lastSeenRef = useRef<string | null>(null);
+  useEffect(() => {
+    const ev = state.lastSynthesis;
+    if (!ev) return;
+    const key = `${ev.slotId}:${ev.itemType}:${ev.isNew ? 'n' : 'o'}`;
+    if (lastSeenRef.current === key) return;
+    lastSeenRef.current = key;
+    const item = ITEMS[ev.itemType];
+    if (!item) return;
+    if (ev.isNew) {
+      toast.success(`新发现：${item.emoji} ${item.name}`, {
+        description: item.description,
+        duration: 3200,
+      });
+    } else {
+      toast(`合成成功：${item.emoji} ${item.name}`, {
+        duration: 1600,
+      });
+    }
+  }, [state.lastSynthesis]);
+  return null;
+}
+
+function MorningToastBridge() {
+  const { state } = useGame();
+  const { dismissMorningSummary } = useDispatch();
+  const lastDayRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!state.lastMorningSummary) return;
+    if (lastDayRef.current === state.day) return;
+    lastDayRef.current = state.day;
+
+    const todayEvents = state.eventLog
+      .filter(e => e.day === state.day && !e.message.startsWith('天气：'))
+      .map(e => `· ${e.message}`);
+    const harvestable = state.farmland.unlocked
+      ? state.farmland.plots.filter(
+          p => p.crop && p.harvestOnDay !== null && state.day >= p.harvestOnDay,
+        ).length
+      : 0;
+    const lines: string[] = [...todayEvents];
+    if (harvestable > 0) lines.push(`🌾 田地有 ${harvestable} 块药草可收获`);
+
+    toast(`🌅 ${state.lastMorningSummary}`, {
+      description: lines.length > 0 ? lines.join('\n') : '今天是安静的一天。',
+      duration: 3200,
+    });
+    dismissMorningSummary();
+  }, [state.lastMorningSummary, state.day]);
+  return null;
+}
+
+function InventoryStage() {
+  const { state } = useGame();
+  const isEmptyTutorial =
+    state.discovered.length <= STARTER_ITEM_IDS.length &&
+    !state.lastSynthesis;
+  return (
+    <div className={`inventory-grid-wrap${isEmptyTutorial ? ' inventory-grid-wrap--tutorial' : ''}`}>
+      <div className="inventory-square">
+        <InventoryGrid />
+        {isEmptyTutorial && (
+          <div className="inventory-tutorial-hint" aria-hidden="true">
+            <span className="inventory-tutorial-hint__line">把任意两个物品拖到一起</span>
+            <span className="inventory-tutorial-hint__sub">先试试 💧 + 🌍</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -66,7 +169,7 @@ function GameLayout() {
           <span className="game-subtitle">拖拽合成 · 探索配方</span>
         </div>
         <WorldBar />
-        <p className="game-tip">将物品拖到另一物品上合成；泥土+种子得树苗，过夜成木材。开垦田地可种药草。</p>
+        <HeaderTip />
         <GameHeaderActions />
       </header>
 
@@ -123,11 +226,7 @@ function GameLayout() {
               <h2 className="cloud-stage__title">☁️ 云端背包</h2>
               <p className="cloud-stage__subtitle">6×6 格子 · 拖拽两格合成</p>
             </div>
-            <div className="inventory-grid-wrap">
-              <div className="inventory-square">
-                <InventoryGrid />
-              </div>
-            </div>
+            <InventoryStage />
           </div>
         </section>
 
@@ -152,8 +251,6 @@ function GameLayout() {
           </div>
         </aside>
       </main>
-
-      <MorningBanner />
     </div>
   );
 }
@@ -162,6 +259,14 @@ function App() {
   return (
     <GameProvider>
       <GameLayout />
+      <SynthesisToastBridge />
+      <MorningToastBridge />
+      <Toaster
+        position="top-center"
+        richColors
+        closeButton
+        toastOptions={{ className: 'alchemy-toast' }}
+      />
     </GameProvider>
   );
 }

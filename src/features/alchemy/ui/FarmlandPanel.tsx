@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'sonner';
 import { useGame, useDispatch } from '../state/gameStore';
 import { FARMLAND_UNLOCK_EARTH_COST, CROP_GROW_DAYS } from '@/game/systems/farmland';
 
@@ -23,7 +24,14 @@ export function FarmlandPanel() {
             type="button"
             className="farmland-panel__unlock"
             disabled={earthCount < FARMLAND_UNLOCK_EARTH_COST}
-            onClick={unlockFarmland}
+            onClick={() => {
+              if (earthCount < FARMLAND_UNLOCK_EARTH_COST) return;
+              unlockFarmland();
+              toast.success('🌾 田地已开垦', {
+                description: '现在可以在田块里种植种子了。',
+                duration: 2400,
+              });
+            }}
             title={`需要泥土 ×${FARMLAND_UNLOCK_EARTH_COST}`}
           >
             开垦（泥土×{FARMLAND_UNLOCK_EARTH_COST}）
@@ -43,7 +51,11 @@ export function FarmlandPanel() {
                   type="button"
                   className="farmland-plot__btn"
                   disabled={seedCount < 1}
-                  onClick={() => plantPlot(idx)}
+                  onClick={() => {
+                    if (seedCount < 1) return;
+                    plantPlot(idx);
+                    toast(`🌱 已播下种子，${CROP_GROW_DAYS} 天后可收获`, { duration: 1800 });
+                  }}
                 >
                   种植（种子×1）
                 </button>
@@ -54,7 +66,10 @@ export function FarmlandPanel() {
                     <button
                       type="button"
                       className="farmland-plot__btn farmland-plot__btn--harvest"
-                      onClick={() => harvestPlot(idx)}
+                      onClick={() => {
+                        harvestPlot(idx);
+                        toast.success('🌿 收获药草 ×2', { duration: 1800 });
+                      }}
                     >
                       收获药草
                     </button>
